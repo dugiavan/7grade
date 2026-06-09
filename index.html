@@ -4033,11 +4033,10 @@
 
         <div class="setup-label">Số câu hỏi</div>
         <div class="choice-row">
-          <button class="choice-btn" id="ubtn-5" onclick="unitSelectCount(5)">5</button>
-          <button class="choice-btn" id="ubtn-10" onclick="unitSelectCount(10)">10</button>
-          <button class="choice-btn" id="ubtn-15" onclick="unitSelectCount(15)">15</button>
           <button class="choice-btn" id="ubtn-20" onclick="unitSelectCount(20)">20</button>
           <button class="choice-btn" id="ubtn-30" onclick="unitSelectCount(30)">30</button>
+          <button class="choice-btn" id="ubtn-40" onclick="unitSelectCount(40)">40</button>
+          <button class="choice-btn" id="ubtn-60" onclick="unitSelectCount(60)">60</button>
         </div>
 
         <button class="btn-go" onclick="startUnitExam()"
@@ -5119,7 +5118,10 @@
       const q = questions[currentQ], total = questions.length;
 
       // KIỂM TRA CHẾ ĐỘ THI ĐỂ HIỂN THỊ HEADER
-      if (isExamMode) {
+      if (isUnitExamMode) {
+        const topicData = DATABASE[q._unit];
+        document.getElementById('ex-topic-lbl').textContent = topicData ? `${topicData.icon} ${topicData.title}` : `📚 Tổng Hợp Unit`;
+      } else if (isExamMode) {
         // Nếu đang thi, lấy Icon từ chính câu hỏi đó (q._topic đã được gán lúc startExam)
         const topicData = DATABASE[q._topic];
         document.getElementById('ex-topic-lbl').textContent = `${topicData.icon} ${topicData.title}`;
@@ -5288,21 +5290,31 @@
       const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '💪';
       const msg = pct >= 80 ? 'Xuất sắc! Con học rất giỏi!' : pct >= 50 ? 'Khá tốt! Tiếp tục cố gắng nhé!' : 'Cần ôn tập thêm! Đừng nản lòng!';
       const wrong = total - score, deg = pct * 3.6, circ = 2 * Math.PI * 48;
-      const diffLabel = examSelectedDiff === 'all' ? '🌈 Tất cả độ khó' : (DIFF_LBL[examSelectedDiff] || DIFF_LBL[selectedDiff] || '');
-      const resultSubLabel = isExamMode
-        ? `${[...examSelectedTopics].map(k => DATABASE[k].icon + ' ' + DATABASE[k].title).join(' · ')} · ${diffLabel}`
-        : `${DATABASE[currentTopic].icon} ${DATABASE[currentTopic].title} · ${DIFF_LBL[selectedDiff]}`;
-      const againBtn = isExamMode
-        ? `<button class="btn-again" onclick="showExamSelect()">🔄 Thi lại</button>`
-        : `<button class="btn-again" onclick="startExercise()">🔄 Luyện lại</button>`;
-      const otherBtn = isExamMode
+      const diffLabel = isUnitExamMode
+        ? (unitSelectedDiff === 'all' ? '🌈 Tất cả độ khó' : DIFF_LBL[unitSelectedDiff])
+        : examSelectedDiff === 'all' ? '🌈 Tất cả độ khó' : (DIFF_LBL[examSelectedDiff] || DIFF_LBL[selectedDiff] || '');
+      const resultSubLabel = isUnitExamMode
+        ? `${[...unitSelectedUnits].map(k => DATABASE[k].icon + ' ' + DATABASE[k].title).join(' · ')} · ${diffLabel}`
+        : isExamMode
+          ? `${[...examSelectedTopics].map(k => DATABASE[k].icon + ' ' + DATABASE[k].title).join(' · ')} · ${diffLabel}`
+          : `${DATABASE[currentTopic].icon} ${DATABASE[currentTopic].title} · ${DIFF_LBL[selectedDiff]}`;
+      const againBtn = isUnitExamMode
+        ? `<button class="btn-again" onclick="startUnitExam()">🔄 Thi lại</button>`
+        : isExamMode
+          ? `<button class="btn-again" onclick="showExamSelect()">🔄 Thi lại</button>`
+          : `<button class="btn-again" onclick="startExercise()">🔄 Luyện lại</button>`;
+      const otherBtn = isUnitExamMode || isExamMode
         ? `<button class="btn-other" onclick="showPage('landing')">🏠 Trang chủ</button>`
         : `<button class="btn-other" onclick="showPage('topics')">📖 Chủ đề khác</button>`;
       let det = '';
       answers.forEach((ans, i) => {
         const { q, userAns, correct } = ans;
         const qt = Array.isArray(q.q) ? q.q.join(' ') : q.q;
-        const topicInfo = isExamMode && q._topic ? `<span style="font-size:.62rem;color:var(--c-accent);font-weight:600;background:rgba(99,82,180,.1);padding:.15rem .5rem;border-radius:50px;margin-left:.2rem;">${DATABASE[q._topic].icon} ${DATABASE[q._topic].title}</span>` : '';
+        const topicInfo = isUnitExamMode && q._unit
+          ? `<span style="font-size:.62rem;color:var(--c-accent);font-weight:600;background:rgba(99,82,180,.1);padding:.15rem .5rem;border-radius:50px;margin-left:.2rem;">${DATABASE[q._unit].icon} ${DATABASE[q._unit].title}</span>`
+          : isExamMode && q._topic
+            ? `<span style="font-size:.62rem;color:var(--c-accent);font-weight:600;background:rgba(99,82,180,.1);padding:.15rem .5rem;border-radius:50px;margin-left:.2rem;">${DATABASE[q._topic].icon} ${DATABASE[q._topic].title}</span>`
+            : '';
         det += `<div class="detail-item ${correct ? 'ci' : 'wi'}">
       <div class="di-head">
         <span class="di-badge ${correct ? 'c' : 'w'}">${correct ? 'Đúng' : 'Sai'}</span>
@@ -5483,7 +5495,7 @@
     function showUnitSelect() {
       unitSelectedUnits = new Set();
       unitSelectedDiff = null;
-      unitSelectedCount = 10;
+      unitSelectedCount = 20;
 
       // Reset hint
       updateUnitHint();
@@ -5503,7 +5515,8 @@
 
       // Reset diff & count buttons
       ['easy', 'medium', 'hard', 'all'].forEach(x => document.getElementById('ubtn-' + x)?.classList.remove('sel'));
-      [5, 10, 15, 20, 30].forEach(x => document.getElementById('ubtn-' + x)?.classList.remove('sel'));
+      [20, 30, 40, 60].forEach(x => document.getElementById('ubtn-' + x)?.classList.remove('sel'));
+      document.getElementById('ubtn-20')?.classList.add('sel');
 
       showPage('unit-select');
     }
@@ -5526,7 +5539,7 @@
 
     function unitSelectCount(n) {
       unitSelectedCount = n;
-      [5, 10, 15, 20, 30].forEach(x => document.getElementById('ubtn-' + x)?.classList.toggle('sel', x === n));
+      [20, 30, 40, 60].forEach(x => document.getElementById('ubtn-' + x)?.classList.toggle('sel', x === n));
       updateUnitHint();
     }
 
